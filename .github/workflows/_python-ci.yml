@@ -1,0 +1,46 @@
+name: Python CI
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.13'
+      coverage-threshold:
+        type: number
+        default: 85
+
+jobs:
+  python-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install ${{ inputs.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uvx ruff check .
+
+      - name: Format check (ruff)
+        run: uvx ruff format --check .
+
+      - name: Type check (pyright)
+        run: uvx pyright
+
+      - name: Test with coverage
+        run: uv run pytest --cov --cov-report=xml --cov-fail-under=${{ inputs.coverage-threshold }}
+
+      - name: Dependency audit
+        run: uvx pip-audit
+
+      - name: Security scan (bandit)
+        run: uvx bandit -r src/ -ll
