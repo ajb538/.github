@@ -34,7 +34,7 @@ jobs:
         run: uvx ruff format --check .
 
       - name: Type check (pyright)
-        run: uvx pyright
+        run: uv run --with pyright pyright
 
       - name: Test with coverage
         run: uv run pytest --cov --cov-report=xml --cov-fail-under=${{ inputs.coverage-threshold }}
