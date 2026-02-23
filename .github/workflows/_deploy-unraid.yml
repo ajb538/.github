@@ -1,0 +1,77 @@
+name: Deploy to Unraid
+
+on:
+  workflow_call:
+    inputs:
+      service-name:
+        description: "Container name on Unraid"
+        type: string
+        required: true
+      image-name:
+        description: "GHCR image name (ghcr.io/ajb538/<image-name>)"
+        type: string
+        required: true
+    secrets:
+      UNRAID_SSH_KEY:
+        required: true
+      UNRAID_HOST:
+        required: true
+      ORCHESTRATOR_URL:
+        required: true
+      TS_AUTHKEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          tags: tag:ci
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.UNRAID_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H ${{ secrets.UNRAID_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Pull new image on Unraid
+        run: |
+          ssh -i ~/.ssh/id_deploy root@${{ secrets.UNRAID_HOST }} \
+            "docker pull ghcr.io/ajb538/${{ inputs.image-name }}:latest"
+
+      - name: Restart container via Unraid
+        run: |
+          ssh -i ~/.ssh/id_deploy root@${{ secrets.UNRAID_HOST }} \
+            "/usr/local/emhttp/plugins/dynamix.docker.manager/scripts/docker restart ${{ inputs.service-name }}"
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/id_deploy root@${{ secrets.UNRAID_HOST }} \
+            "for i in \$(seq 1 12); do
+              STATUS=\$(docker inspect --format '{{.State.Status}}' ${{ inputs.service-name }} 2>/dev/null)
+              if [ \"\$STATUS\" = 'running' ]; then
+                echo 'Container is running'; exit 0
+              fi
+              echo \"Attempt \$i: status=\$STATUS — waiting...\"; sleep 5
+            done
+            echo 'Health check timed out after 60s'; exit 1"
+
+      - name: Notify WhatsApp on success
+        if: success()
+        run: |
+          IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          curl -s -X POST "${{ secrets.ORCHESTRATOR_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_whatsapp\",\"arguments\":{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}},\"id\":1}"
+
+      - name: Notify WhatsApp on failure
+        if: failure()
+        run: |
+          IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          curl -s -X POST "${{ secrets.ORCHESTRATOR_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_whatsapp\",\"arguments\":{\"message\":\"❌ Deploy of ${{ inputs.service-name }}:sha-${IMAGE_SHA} FAILED — check Unraid logs\"}},\"id\":1}"
