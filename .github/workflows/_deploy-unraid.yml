@@ -16,7 +16,7 @@ on:
         required: true
       UNRAID_HOST:
         required: true
-      ORCHESTRATOR_URL:
+      SIDECAR_URL:
         required: true
       TS_AUTHKEY:
         required: true
@@ -39,9 +39,14 @@ jobs:
           ssh-keyscan -H ${{ secrets.UNRAID_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Pull new image on Unraid
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GH_ACTOR: ${{ github.actor }}
         run: |
           ssh -i ~/.ssh/id_deploy root@${{ secrets.UNRAID_HOST }} \
-            "docker pull ghcr.io/ajb538/${{ inputs.image-name }}:latest"
+            "echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GH_ACTOR}' --password-stdin && \
+             docker pull ghcr.io/ajb538/${{ inputs.image-name }}:latest && \
+             docker logout ghcr.io"
 
       - name: Restart container via Unraid
         run: |
@@ -64,14 +69,14 @@ jobs:
         if: success()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.ORCHESTRATOR_URL }}" \
+          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_whatsapp\",\"arguments\":{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}},\"id\":1}"
+            -d "{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}"
 
       - name: Notify WhatsApp on failure
         if: failure()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.ORCHESTRATOR_URL }}" \
+          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"send_whatsapp\",\"arguments\":{\"message\":\"❌ Deploy of ${{ inputs.service-name }}:sha-${IMAGE_SHA} FAILED — check Unraid logs\"}},\"id\":1}"
+            -d "{\"message\":\"❌ Deploy of ${{ inputs.service-name }}:sha-${IMAGE_SHA} FAILED — check Unraid logs\"}"
