@@ -71,14 +71,16 @@ jobs:
         if: success()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}"
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new root@${{ secrets.UNRAID_HOST }} \
+            "curl -s -X POST '${{ secrets.SIDECAR_URL }}' \
+              -H 'Content-Type: application/json' \
+              -d '{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}'"
 
       - name: Notify WhatsApp on failure
         if: failure()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"message\":\"❌ Deploy of ${{ inputs.service-name }}:sha-${IMAGE_SHA} FAILED — check Unraid logs\"}"
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new root@${{ secrets.UNRAID_HOST }} \
+            "curl -s -X POST '${{ secrets.SIDECAR_URL }}' \
+              -H 'Content-Type: application/json' \
+              -d '{\"message\":\"❌ Deploy of ${{ inputs.service-name }}:sha-${IMAGE_SHA} FAILED — check Unraid logs\"}'"
