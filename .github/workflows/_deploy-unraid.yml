@@ -34,8 +34,7 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s
-' "$UNRAID_SSH_KEY" > ~/.ssh/id_deploy
+          printf '%s\n' "$UNRAID_SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H ${{ secrets.UNRAID_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
         env:
@@ -73,14 +72,14 @@ jobs:
         if: success()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
+          curl -sf -X POST "${{ secrets.SIDECAR_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"message\":\"✅ Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}"
+            -d "{\"message\":\"Deployed ${{ inputs.service-name }}:sha-${IMAGE_SHA} to labrador\"}" || true
 
       - name: Notify on failure
         if: failure()
         run: |
           IMAGE_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          curl -s -X POST "${{ secrets.SIDECAR_URL }}" \
+          curl -sf -X POST "${{ secrets.SIDECAR_URL }}" \
             -H "Content-Type: application/json" \
-            -d "{\"message\":\"❌ Deploy FAILED ${{ inputs.service-name }}:sha-${IMAGE_SHA} — check Unraid logs\"}"
+            -d "{\"message\":\"Deploy FAILED ${{ inputs.service-name }}:sha-${IMAGE_SHA} - check Unraid logs\"}" || true
