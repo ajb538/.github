@@ -58,7 +58,7 @@ jobs:
             }')
 
           RESPONSE=$(curl -sf \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${GEMINI_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD")
 
@@ -85,7 +85,7 @@ jobs:
               review,
               '',
               '---',
-              `*Reviewed ${Number(diffSize).toLocaleString()} bytes of diff · Powered by Gemini 2.0 Flash*`
+              `*Reviewed ${Number(diffSize).toLocaleString()} bytes of diff · Powered by Gemini 3.0 Flash*`
             ].join('\n');
 
             await github.rest.issues.createComment({
